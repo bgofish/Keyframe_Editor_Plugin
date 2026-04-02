@@ -1,0 +1,26 @@
+<rml>
+<head>
+    <title>Keyframe Editor</title>
+    <link type="text/rcss" href="main_panel.rcss"/>
+</head>
+<body>
+    <div id="kfe-root">
+
+        <div id="kfe-header">
+            <span id="kfe-title">Keyframe Editor</span>
+            <span id="kfe-subtitle">Edit camera path keyframes as a table</span>
+        </div>
+
+        <!--
+            THIS div is the injection point for draw(ui) content.
+            The id must be exactly "im-root" for LichtFeld to locate it.
+        -->
+        <div id="im-root"></div>
+
+        <div id="kfe-footer">
+            <span>Tip: edit a cell to stage changes, then OK to apply that row or Apply All for all rows.</span>
+        </div>
+
+    </div>
+</body>
+</rml>

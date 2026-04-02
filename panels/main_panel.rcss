@@ -1,0 +1,94 @@
+/* Keyframe Editor – main_panel.rcss */
+
+#kfe-root {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background-color: #1a1a1e;
+    color: #e0e0e0;
+    font-family: monospace;
+    font-size: 12dp;
+}
+
+#kfe-header {
+    display: block;
+    padding: 8dp 12dp 6dp 12dp;
+    background-color: #23232a;
+    border-bottom-width: 1dp;
+    border-bottom-color: #3a3a4a;
+}
+
+#kfe-title {
+    display: inline-block;
+    font-size: 14dp;
+    font-weight: bold;
+    color: #a0c8ff;
+    margin-right: 10dp;
+}
+
+#kfe-subtitle {
+    display: inline-block;
+    font-size: 10dp;
+    color: #666680;
+}
+
+/* im-root is where draw(ui) content lands */
+#im-root {
+    display: block;
+    overflow-y: auto;
+    padding: 6dp 8dp;
+}
+
+#kfe-footer {
+    display: block;
+    padding: 4dp 12dp;
+    background-color: #1e1e26;
+    border-top-width: 1dp;
+    border-top-color: #333340;
+    font-size: 10dp;
+    color: #55556a;
+    font-style: italic;
+}
+
+button {
+    background-color: #2e3248;
+    color: #b0b8e0;
+    border-width: 1dp;
+    border-color: #4a4e6a;
+    border-radius: 3dp;
+    padding: 3dp 8dp;
+    font-size: 11dp;
+    margin-right: 4dp;
+}
+
+button:hover {
+    background-color: #3a4060;
+    color: #d0d8ff;
+}
+
+input {
+    background-color: #28283a;
+    color: #d8d8f0;
+    border-width: 1dp;
+    border-color: #3c3c52;
+    padding: 2dp 4dp;
+    font-family: monospace;
+    font-size: 11dp;
+    border-radius: 2dp;
+}
+
+input:focus {
+    border-color: #5588ff;
+    background-color: #2e2e46;
+}
+
+textarea {
+    background-color: #111118;
+    color: #88ffa0;
+    border-width: 1dp;
+    border-color: #2a2a3a;
+    font-family: monospace;
+    font-size: 10dp;
+    padding: 4dp;
+    width: 100%;
+}
