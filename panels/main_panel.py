@@ -475,14 +475,14 @@ class KeyframeEditorPanel(lf.ui.Panel):
         if ui.small_button("-##cm"):
             self._time_mult = max(0.01, round(self._time_mult - 0.5, 2))
         ui.same_line()
+        if ui.small_button("+##cm"):
+            self._time_mult = round(self._time_mult + 0.5, 2)
+        ui.same_line()
         val_changed, new_mult = _try_input_float(
             ui, "##custom_mult", self._time_mult, 70
         )
         if val_changed:
             self._time_mult = max(0.01, new_mult)
-        ui.same_line()
-        if ui.small_button("+##cm"):
-            self._time_mult = round(self._time_mult + 0.5, 2)
         ui.same_line()
         if ui.button("Apply##cm"):
             e = self._apply_time_multiplier(self._time_mult, kf_nodes)
