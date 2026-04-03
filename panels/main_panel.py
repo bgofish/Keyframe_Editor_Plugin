@@ -1,5 +1,5 @@
 """
-Keyframe Editor Panel - FINAL VERSION
+Keyframe Editor Panel - DRAFT VERSION
 All 9 fields editable via save→edit→reload JSON camera path.
 Layout: Label | [value box] | [slider] | [-] Med [+]
 """
@@ -9,12 +9,12 @@ import tempfile
 import os
 import lichtfeld as lf
 
-_FLOAT_COLS = ["time", "pos_x", "pos_y", "pos_z", "rot_x", "rot_y", "rot_z", "rot_w", "fov_mm"]
+_FLOAT_COLS = ["time", "pos_x", "pos_y", "pos_z", "rot_x", "rot_y", "rot_z", "rot_w", "Lens_mm"]
 _EDIT_COLS  = _FLOAT_COLS
 
 _SPEED_PRESETS = {
     "time":   [10.0, 1.0,  0.1],
-    "fov_mm": [10.0, 1.0,  0.1],
+    "Lens_mm": [10.0, 1.0,  0.1],
     "pos_x":  [1.0,  0.1,  0.001],
     "pos_y":  [1.0,  0.1,  0.001],
     "pos_z":  [1.0,  0.1,  0.001],
@@ -32,7 +32,7 @@ _VAL_W     = 100
 # (col, label, min, max)
 _EDITOR_FIELDS = [
     ("time",   "Time",    0.0,    3600.0),
-    ("fov_mm", "FoV mm",  1.0,    300.0),
+    ("Lens_mm", "Lens mm",  1.0,    300.0),
     ("pos_x",  "Pos X",   -200.0, 200.0),
     ("pos_y",  "Pos Y",   -200.0, 200.0),
     ("pos_z",  "Pos Z",   -200.0, 200.0),
@@ -43,7 +43,7 @@ _EDITOR_FIELDS = [
 ]
 
 _GROUP_BEFORE = {
-    "time":   "Time & FoV",
+    "time":   "Time & Lens",
     "pos_x":  "Position",
     "rot_x":  "Rotation (quaternion)",
 }
@@ -66,7 +66,7 @@ def _node_to_dict(node) -> dict:
         "pos_x": float(pos[0]), "pos_y": float(pos[1]), "pos_z": float(pos[2]),
         "rot_x": float(rot[0]), "rot_y": float(rot[1]),
         "rot_z": float(rot[2]), "rot_w": float(rot[3]),
-        "fov_mm":float(kf.focal_length_mm),
+        "lens_mm":float(kf.focal_length_mm),
     }
 
 
@@ -111,8 +111,8 @@ def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
             kf = keyframes[i]
             if "time" in ed:
                 kf["time"] = float(ed["time"])
-            if "fov_mm" in ed:
-                kf["focal_length_mm"] = float(ed["fov_mm"])
+            if "lens_mm" in ed:
+                kf["focal_length_mm"] = float(ed["lens_mm"])
             if any(k in ed for k in ("pos_x", "pos_y", "pos_z")):
                 kf["position"] = [
                     float(ed.get("pos_x", kf["position"][0])),
@@ -329,7 +329,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.label("Name")
         ui.same_line()
         ui.set_next_item_width(_SUMMARY_W)
-        ui.label("Summary  (Time | Pos | Rot | FoV)")
+        ui.label("Summary  (Time | Pos | Rot | Lens)")
         ui.same_line()
         ui.label("Actions")
         ui.separator()
@@ -350,7 +350,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
                 f"p=({_fmt(cur['pos_x'])}, {_fmt(cur['pos_y'])}, {_fmt(cur['pos_z'])})  "
                 f"r=({_fmt(cur['rot_x'])}, {_fmt(cur['rot_y'])}, "
                 f"{_fmt(cur['rot_z'])}, {_fmt(cur['rot_w'])})  "
-                f"f={_fmt(cur['fov_mm'])}"
+                f"f={_fmt(cur['lens_mm'])}"
             )
             ui.set_next_item_width(_SUMMARY_W)
             if ed:
