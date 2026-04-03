@@ -24,7 +24,7 @@ _SPEED_PRESETS = {
 }
 _SPEED_LABELS = ["Fast", "Med", "Fine"]
 
-_DRAG_W    = 50   # narrower slider to make room
+_DRAG_W    = 250   # narrower slider to make room
 _VAL_W     = 100   # manual input box
 _LIVE_W    = 100    # live value label width
 
