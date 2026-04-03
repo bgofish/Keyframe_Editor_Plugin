@@ -25,7 +25,7 @@ _SPEED_PRESETS = {
 _SPEED_LABELS = ["Fast", "Med", "Fine"]
 
 _DRAG_W    = 100   # narrower slider to make room
-_VAL_W     = 50   # manual input box
+_VAL_W     = 100   # manual input box
 _LIVE_W    = 100    # live value label width
 
 # (col, label, min, max)  — all editable now
@@ -158,18 +158,15 @@ def _fmt(v: float) -> str:
 
 
 def _try_input_float(ui, uid, val, width):
-    """Always display current val — so drag changes are reflected immediately."""
     ui.set_next_item_width(width)
-    # Try input_float first
     try:
         changed, new_val = ui.input_float(uid, val)
         return changed, float(new_val)
     except Exception:
         pass
-    # Fallback: input_text — pass current val as string so it always reflects drag
+    ui.set_next_item_width(width)  # must re-set before fallback widget
     try:
-        ui.set_next_item_width(width)
-        changed, text = ui.input_text(uid, f"{val:.3f}")
+        changed, text = ui.input_text(uid + "_t", f"{val:.3f}")
         if changed:
             try:
                 return True, float(text)
