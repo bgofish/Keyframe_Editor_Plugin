@@ -1,6 +1,6 @@
 [project]
 name = "Keyframe_Editor"
-version = "0.1.4"
+version = "0.1.5"
 description = "Edit timeline keyframes in a spreadsheet-style panel"
 authors = [{name = "Brian Davis (bb6)"}]
 dependencies = []
