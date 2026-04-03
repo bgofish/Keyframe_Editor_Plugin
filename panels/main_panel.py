@@ -242,17 +242,15 @@ class KeyframeEditorPanel(lf.ui.Panel):
             ui.label(lbl)
             ui.same_line()
 
-            # [-] Med [+]
-            if ui.small_button(f"-##{nid}_{col}"):
-                self._cycle_speed(nid, col, -1)
-            ui.same_line()
-            ui.label(spd_lbl)
-            ui.same_line()
-            if ui.small_button(f"+##{nid}_{col}"):
-                self._cycle_speed(nid, col, +1)
+            # Manual input box — immediately after label
+            val_changed, typed_val = _try_input_float(
+                ui, f"##val_{nid}_{col}", buf[col], _VAL_W
+            )
+            if val_changed:
+                buf[col] = max(mn, min(mx, typed_val))
             ui.same_line()
 
-            # Slider — try to suppress value display with empty format string
+            # Slider
             ui.set_next_item_width(_DRAG_W)
             try:
                 changed, new_val = ui.slider_float(
@@ -267,6 +265,15 @@ class KeyframeEditorPanel(lf.ui.Panel):
                 if changed:
                     buf[col] = float(new_val)
             ui.same_line()
+
+            # [-] Med [+] on the right
+            if ui.small_button(f"-##{nid}_{col}"):
+                self._cycle_speed(nid, col, -1)
+            ui.same_line()
+            ui.label(spd_lbl)
+            ui.same_line()
+            if ui.small_button(f"+##{nid}_{col}"):
+                self._cycle_speed(nid, col, +1)
 
             # Manual input box — sole value display
             val_changed, typed_val = _try_input_float(
