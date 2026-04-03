@@ -1,7 +1,8 @@
 """
-Keyframe Editor Panel - FINAL VERSION v4
+Keyframe Editor Panel - FINAL VERSION v5
+- Fixed time multiplier +/- buttons updating the input box
 - Duplicate, Copy/Paste, Reorder (↑↓), Delete keyframe
-- Global time multiplier toolbar
+- Global time multiplier toolbar with presets and custom value
 - Easing selector (no easing on last frame)
 - All 9 fields editable via JSON round-trip
 - Layout: Label | [value box] | [slider] | [-] Med [+]
@@ -131,8 +132,8 @@ def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
             ed = edits[nid]
             kf = keyframes[i]
 
-            if "time"  in ed: kf["time"]            = float(ed["time"])
-            if "lens"  in ed: kf["focal_length_mm"] = float(ed["lens"])
+            if "time" in ed: kf["time"]            = float(ed["time"])
+            if "lens" in ed: kf["focal_length_mm"] = float(ed["lens"])
             if any(k in ed for k in ("pos_x", "pos_y", "pos_z")):
                 kf["position"] = [
                     float(ed.get("pos_x", kf["position"][0])),
@@ -187,13 +188,14 @@ class KeyframeEditorPanel(lf.ui.Panel):
         return True
 
     def __init__(self):
-        self._edits:     dict[str, dict] = {}
-        self._expanded:  str | None = None
-        self._edit_buf:  dict = {}
-        self._speed_idx: dict[str, dict[str, int]] = {}
-        self._clipboard: dict | None = None
-        self._time_mult: float = 1.0
-        self._status:    str = ""
+        self._edits:         dict[str, dict] = {}
+        self._expanded:      str | None = None
+        self._edit_buf:      dict = {}
+        self._speed_idx:     dict[str, dict[str, int]] = {}
+        self._clipboard:     dict | None = None
+        self._time_mult:     float = 1.0
+        self._time_mult_str: str = "1.00"
+        self._status:        str = ""
 
     # ── helpers ───────────────────────────────────────────────────────────
 
@@ -210,6 +212,10 @@ class KeyframeEditorPanel(lf.ui.Panel):
             live = _node_to_dict(node)
             self._edit_buf = {**live, **self._edits.get(nid, {})}
             self._expanded = nid
+
+    def _set_time_mult(self, value: float):
+        self._time_mult     = max(0.01, round(value, 2))
+        self._time_mult_str = f"{self._time_mult:.2f}"
 
     # ── global operations ─────────────────────────────────────────────────
 
@@ -459,6 +465,8 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.spacing()
         ui.label("Time Multiplier")
         ui.separator()
+
+        # Preset buttons
         ui.label("Presets:")
         ui.same_line()
         for mult in _TIME_MULTIPLIERS:
@@ -470,19 +478,32 @@ class KeyframeEditorPanel(lf.ui.Panel):
             ui.same_line()
         ui.new_line()
 
+        # Custom value — [-] [+] buttons update the string buffer explicitly
         ui.label("Custom:")
         ui.same_line()
         if ui.small_button("-##cm"):
-            self._time_mult = max(0.01, round(self._time_mult - 0.5, 2))
+            self._set_time_mult(self._time_mult - 0.5)
         ui.same_line()
         if ui.small_button("+##cm"):
-            self._time_mult = round(self._time_mult + 0.5, 2)
+            self._set_time_mult(self._time_mult + 0.5)
         ui.same_line()
-        val_changed, new_mult = _try_input_float(
-            ui, "##custom_mult", self._time_mult, 70
-        )
-        if val_changed:
-            self._time_mult = max(0.01, new_mult)
+        # input_text so we fully control the displayed string
+        ui.set_next_item_width(80)
+        try:
+            changed, text = ui.input_text("##custom_mult", self._time_mult_str)
+            if changed:
+                self._time_mult_str = text
+                try:
+                    self._time_mult = max(0.01, float(text))
+                except ValueError:
+                    pass
+        except Exception:
+            # fallback to input_float if input_text unavailable
+            val_changed, new_mult = _try_input_float(
+                ui, "##custom_mult", self._time_mult, 80
+            )
+            if val_changed:
+                self._set_time_mult(new_mult)
         ui.same_line()
         if ui.button("Apply##cm"):
             e = self._apply_time_multiplier(self._time_mult, kf_nodes)
