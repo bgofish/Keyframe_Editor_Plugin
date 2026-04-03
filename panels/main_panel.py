@@ -30,7 +30,7 @@ _SPEED_PRESETS = {
 }
 _SPEED_LABELS  = ["Fast", "Med", "Fine"]
 _EASING_LABELS = ["Linear", "EaseIn", "EaseOut", "EaseInOut"]
-_TIME_MULTIPLIERS = [0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0]
+_TIME_MULTIPLIERS = [0.02, 0.05, 0.1, 0.2, 0.5, 2.0, 5.0, 10.0, 20.0, 50.0]
 
 _SUMMARY_W = 440
 _DRAG_W    = 200
