@@ -1,13 +1,10 @@
 """
-Keyframe Editor Panel - FINAL VERSION v3
-New features:
-  - Duplicate keyframe button per row
-  - Copy / Paste keyframe data between rows
-  - Reorder: Move Up / Move Down buttons per row
-  - Global time multiplier toolbar (x1, x2, x5, x10, x20, x50, custom)
-  - fov_mm shown as Lens
-  - Easing selector (no easing on last frame)
-  - All 9 fields editable via JSON round-trip
+Keyframe Editor Panel - FINAL VERSION v4
+- Duplicate, Copy/Paste, Reorder (↑↓), Delete keyframe
+- Global time multiplier toolbar
+- Easing selector (no easing on last frame)
+- All 9 fields editable via JSON round-trip
+- Layout: Label | [value box] | [slider] | [-] Med [+]
 """
 from __future__ import annotations
 import copy
@@ -32,9 +29,7 @@ _SPEED_PRESETS = {
 }
 _SPEED_LABELS  = ["Fast", "Med", "Fine"]
 _EASING_LABELS = ["Linear", "EaseIn", "EaseOut", "EaseInOut"]
-
-# Time multiplier presets
-_TIME_MULTIPLIERS = [0.02, 0.05, 0.1, 0.2, 0.5, 2.0, 5.0, 10.0, 20.0, 50.0]
+_TIME_MULTIPLIERS = [0.25, 0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 50.0]
 
 _SUMMARY_W = 440
 _DRAG_W    = 200
@@ -101,7 +96,6 @@ def _load_camera_path_json() -> dict | None:
 
 
 def _reload_from_keyframe_list(keyframe_list: list, version: int = 3) -> str:
-    """Write a keyframe list directly to a temp JSON and reload."""
     try:
         data = {"version": version, "keyframes": keyframe_list}
         tmp  = tempfile.mktemp(suffix=".json")
@@ -117,20 +111,7 @@ def _reload_from_keyframe_list(keyframe_list: list, version: int = 3) -> str:
         return str(exc)
 
 
-def _dict_to_json_kf(d: dict, easing: int = 0) -> dict:
-    """Convert an editor dict back to JSON keyframe format."""
-    return {
-        "easing":         easing,
-        "focal_length_mm": float(d["lens"]),
-        "position":       [float(d["pos_x"]), float(d["pos_y"]), float(d["pos_z"])],
-        "rotation":       [float(d["rot_x"]), float(d["rot_y"]),
-                           float(d["rot_z"]), float(d["rot_w"])],
-        "time":           float(d["time"]),
-    }
-
-
 def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
-    """Apply pending edits to the JSON camera path and reload."""
     try:
         data = _load_camera_path_json()
         if data is None:
@@ -206,15 +187,15 @@ class KeyframeEditorPanel(lf.ui.Panel):
         return True
 
     def __init__(self):
-        self._edits:       dict[str, dict] = {}
-        self._expanded:    str | None = None
-        self._edit_buf:    dict = {}
-        self._speed_idx:   dict[str, dict[str, int]] = {}
-        self._clipboard:   dict | None = None          # copied keyframe data
-        self._time_mult:   float = 1.0                 # current time multiplier
-        self._status:      str = ""
+        self._edits:     dict[str, dict] = {}
+        self._expanded:  str | None = None
+        self._edit_buf:  dict = {}
+        self._speed_idx: dict[str, dict[str, int]] = {}
+        self._clipboard: dict | None = None
+        self._time_mult: float = 1.0
+        self._status:    str = ""
 
-    # ── speed helpers ─────────────────────────────────────────────────────
+    # ── helpers ───────────────────────────────────────────────────────────
 
     def _cycle_speed(self, nid, col, direction):
         ns = self._speed_idx.setdefault(nid, {})
@@ -233,7 +214,6 @@ class KeyframeEditorPanel(lf.ui.Panel):
     # ── global operations ─────────────────────────────────────────────────
 
     def _apply_time_multiplier(self, multiplier: float, all_nodes: list) -> str:
-        """Multiply all keyframe times by multiplier via JSON round-trip."""
         try:
             data = _load_camera_path_json()
             if data is None:
@@ -247,7 +227,6 @@ class KeyframeEditorPanel(lf.ui.Panel):
             return str(exc)
 
     def _duplicate_keyframe(self, node, all_nodes: list) -> str:
-        """Insert a copy of this keyframe with time offset +1."""
         try:
             data = _load_camera_path_json()
             if data is None:
@@ -264,23 +243,39 @@ class KeyframeEditorPanel(lf.ui.Panel):
             if idx is None:
                 return "Node not found"
 
-            new_kf       = copy.deepcopy(keyframes[idx])
+            new_kf         = copy.deepcopy(keyframes[idx])
             new_kf["time"] = float(new_kf["time"]) + 1.0
-            # Insert after current position
             keyframes.insert(idx + 1, new_kf)
-            # Fix easing: new last entry should have easing=0
-            # (last frame easing is ignored but keep it clean)
+            return _reload_from_keyframe_list(keyframes, data.get("version", 3))
+        except Exception as exc:
+            return str(exc)
+
+    def _delete_keyframe(self, node, all_nodes: list) -> str:
+        try:
+            data = _load_camera_path_json()
+            if data is None:
+                return "Failed to load camera path"
+
+            keyframes    = data.get("keyframes", [])
+            nodes_sorted = sorted(all_nodes, key=lambda n: float(n.keyframe_data().time))
+
+            if len(nodes_sorted) != len(keyframes):
+                return "Node count mismatch"
+
+            if len(keyframes) <= 1:
+                return "Cannot delete the only keyframe."
+
+            idx = next((i for i, n in enumerate(nodes_sorted)
+                        if str(n.id) == str(node.id)), None)
+            if idx is None:
+                return "Node not found"
+
+            keyframes.pop(idx)
             return _reload_from_keyframe_list(keyframes, data.get("version", 3))
         except Exception as exc:
             return str(exc)
 
     def _move_keyframe(self, node, direction: int, all_nodes: list) -> str:
-        """
-        Swap this keyframe with its neighbour in the sorted list.
-        direction: -1 = move earlier (swap times with prev),
-                   +1 = move later  (swap times with next)
-        Swaps only the time values so the camera path order changes.
-        """
         try:
             data = _load_camera_path_json()
             if data is None:
@@ -299,17 +294,13 @@ class KeyframeEditorPanel(lf.ui.Panel):
 
             swap_idx = idx + direction
             if swap_idx < 0 or swap_idx >= len(keyframes):
-                return ""  # already at boundary, silently ignore
+                return ""
 
-            # Swap times between the two entries
             t_a = keyframes[idx]["time"]
             t_b = keyframes[swap_idx]["time"]
             keyframes[idx]["time"]      = t_b
             keyframes[swap_idx]["time"] = t_a
-
-            # Re-sort by time so the reload is in correct order
             keyframes.sort(key=lambda k: k["time"])
-
             return _reload_from_keyframe_list(keyframes, data.get("version", 3))
         except Exception as exc:
             return str(exc)
@@ -330,7 +321,6 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.separator()
         ui.spacing()
 
-        # ── Float fields ──────────────────────────────────────────────────
         for col, lbl, mn, mx in _EDITOR_FIELDS:
             if col in _GROUP_BEFORE:
                 ui.spacing()
@@ -476,12 +466,10 @@ class KeyframeEditorPanel(lf.ui.Panel):
                    else f"{mult}x")
             if ui.small_button(f"{lbl}##tm"):
                 e = self._apply_time_multiplier(mult, kf_nodes)
-                self._status = (f"Error: {e}" if e
-                                else f"All times × {lbl}.")
+                self._status = f"Error: {e}" if e else f"All times × {lbl}."
             ui.same_line()
         ui.new_line()
 
-        # Custom multiplier with [-] value [+] and Apply
         ui.label("Custom:")
         ui.same_line()
         if ui.small_button("-##cm"):
@@ -498,16 +486,17 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.same_line()
         if ui.button("Apply##cm"):
             e = self._apply_time_multiplier(self._time_mult, kf_nodes)
-            self._status = (f"Error: {e}" if e
-                            else f"All times × {self._time_mult}.")
+            self._status = f"Error: {e}" if e else f"All times × {self._time_mult}."
 
         ui.separator()
 
         pending = sum(len(v) for v in self._edits.values())
-        ui.label(f"{len(kf_nodes)} keyframe(s)" +
-                 (f"  |  {pending} unsaved change(s)" if pending else "") +
-                 (f"  |  clipboard: {_fmt(self._clipboard['time'])}" 
-                  if self._clipboard else ""))
+        ui.label(
+            f"{len(kf_nodes)} keyframe(s)" +
+            (f"  |  {pending} unsaved change(s)" if pending else "") +
+            (f"  |  clipboard: t={_fmt(self._clipboard['time'])}"
+             if self._clipboard else "")
+        )
         ui.separator()
 
         # ── Column header ─────────────────────────────────────────────────
@@ -521,12 +510,12 @@ class KeyframeEditorPanel(lf.ui.Panel):
 
         # ── Data rows ─────────────────────────────────────────────────────
         for node in kf_nodes_sorted:
-            nid     = str(node.id)
-            live    = _node_to_dict(node)
-            ed      = self._edits.get(nid, {})
-            cur     = {**live, **ed}
-            is_open = (self._expanded == nid)
-            is_last = (nid == last_nid)
+            nid      = str(node.id)
+            live     = _node_to_dict(node)
+            ed       = self._edits.get(nid, {})
+            cur      = {**live, **ed}
+            is_open  = (self._expanded == nid)
+            is_last  = (nid == last_nid)
             is_first = (node is kf_nodes_sorted[0])
 
             ui.label(node.name)
@@ -561,39 +550,49 @@ class KeyframeEditorPanel(lf.ui.Panel):
                 self._status    = f"Copied {node.name}."
             ui.same_line()
 
-            # Paste (only if clipboard holds data)
+            # Paste
             if self._clipboard is not None:
                 if ui.small_button(f"Paste##{nid}"):
-                    # Paste all fields except time (keep original time)
-                    paste = copy.deepcopy(self._clipboard)
-                    paste["time"]   = live["time"]    # preserve destination time
-                    paste["easing"] = live["easing"]  # preserve destination easing
+                    paste           = copy.deepcopy(self._clipboard)
+                    paste["time"]   = live["time"]
+                    paste["easing"] = live["easing"]
                     e = _write_single_node(node, paste, kf_nodes)
-                    self._status = (f"Error: {e}" if e
-                                    else f"Pasted into {node.name}.")
+                    self._status = f"Error: {e}" if e else f"Pasted into {node.name}."
                 ui.same_line()
 
             # Duplicate
             if ui.small_button(f"Dup##{nid}"):
                 e = self._duplicate_keyframe(node, kf_nodes)
-                self._status = (f"Error: {e}" if e
-                                else f"Duplicated {node.name}.")
+                self._status = f"Error: {e}" if e else f"Duplicated {node.name}."
+            ui.same_line()
 
-            # Move Up / Move Down (reorder by swapping times)
+            # Move Up
             if not is_first:
-                ui.same_line()
                 if ui.small_button(f"↑##{nid}"):
                     e = self._move_keyframe(node, -1, kf_nodes)
-                    self._status = (f"Error: {e}" if e
-                                    else f"{node.name} moved earlier.")
-            if not is_last:
+                    self._status = f"Error: {e}" if e else f"{node.name} moved earlier."
                 ui.same_line()
+
+            # Move Down
+            if not is_last:
                 if ui.small_button(f"↓##{nid}"):
                     e = self._move_keyframe(node, +1, kf_nodes)
-                    self._status = (f"Error: {e}" if e
-                                    else f"{node.name} moved later.")
+                    self._status = f"Error: {e}" if e else f"{node.name} moved later."
+                ui.same_line()
 
-            # Discard draft indicator
+            # Delete
+            if ui.small_button(f"Del##{nid}"):
+                e = self._delete_keyframe(node, kf_nodes)
+                if e:
+                    self._status = f"Error: {e}"
+                else:
+                    self._edits.pop(nid, None)
+                    if self._expanded == nid:
+                        self._expanded = None
+                        self._edit_buf = {}
+                    self._status = f"{node.name} deleted."
+
+            # Discard draft
             if ed and not is_open:
                 ui.same_line()
                 if ui.small_button(f"X##{nid}"):
