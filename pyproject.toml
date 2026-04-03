@@ -1,8 +1,8 @@
 [project]
 name = "Keyframe_Editor"
 version = "0.1.5"
-description = "Edit timeline keyframes in a spreadsheet-style panel"
-authors = [{name = "Brian Davis (bb6)"}]
+description = "Edit timeline keyframes in a Table-style panel"
+authors = "Brian Davis (bb6)"
 dependencies = []
 
 [tool.lichtfeld]
