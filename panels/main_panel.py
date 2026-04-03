@@ -1,6 +1,6 @@
 """
 Keyframe Editor Panel - FINAL VERSION v5
-- Fixed time multiplier +/- buttons updating the input box
+- Fixed time multiplier => +/- buttonsremoved & changed to 3 decimal places
 - Duplicate, Copy/Paste, Reorder (↑↓), Delete keyframe
 - Global time multiplier toolbar with presets and custom value
 - Easing selector (no easing on last frame)
@@ -193,8 +193,8 @@ class KeyframeEditorPanel(lf.ui.Panel):
         self._edit_buf:      dict = {}
         self._speed_idx:     dict[str, dict[str, int]] = {}
         self._clipboard:     dict | None = None
-        self._time_mult:     float = 1.0
-        self._time_mult_str: str = "1.00"
+        self._time_mult:     float = 1.000
+        self._time_mult_str: str = "1.001"
         self._status:        str = ""
 
     # ── helpers ───────────────────────────────────────────────────────────
@@ -214,8 +214,8 @@ class KeyframeEditorPanel(lf.ui.Panel):
             self._expanded = nid
 
     def _set_time_mult(self, value: float):
-        self._time_mult     = max(0.01, round(value, 2))
-        self._time_mult_str = f"{self._time_mult:.2f}"
+        self._time_mult     = max(0.01, round(value, 3))
+        self._time_mult_str = f"{self._time_mult:.3f}"
 
     # ── global operations ─────────────────────────────────────────────────
 
@@ -478,16 +478,8 @@ class KeyframeEditorPanel(lf.ui.Panel):
             ui.same_line()
         ui.new_line()
 
-        # Custom value — [-] label [+] manual entry [Apply]
-        ui.label("Custom:")
-        ui.same_line()
-        if ui.small_button("-##cm"):
-            self._set_time_mult(self._time_mult - 0.5)
-        ui.same_line()
-        ui.label(f"{self._time_mult:.2f}x")
-        ui.same_line()
-        if ui.small_button("+##cm"):
-            self._set_time_mult(self._time_mult + 0.5)
+        ui.label("Custom-x:")
+
         ui.same_line()
         val_changed, new_mult = _try_input_float(
             ui, "##custom_mult_manual", self._time_mult, 80
@@ -497,7 +489,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.same_line()
         if ui.button("Apply##cm"):
             e = self._apply_time_multiplier(self._time_mult, kf_nodes)
-            self._status = f"Error: {e}" if e else f"All times × {self._time_mult:.2f}."
+            self._status = f"Error: {e}" if e else f"All times × {self._time_mult:.3f}."
 
         ui.separator()
 
