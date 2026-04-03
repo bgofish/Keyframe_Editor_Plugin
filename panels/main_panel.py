@@ -24,7 +24,7 @@ _SPEED_PRESETS = {
 }
 _SPEED_LABELS = ["Fast", "Med", "Fine"]
 
-_DRAG_W    = 200   # narrower slider to make room
+_DRAG_W    = 80   # narrower slider to make room
 _VAL_W     = 100   # manual input box
 _LIVE_W    = 100    # live value label width
 
@@ -267,7 +267,8 @@ class KeyframeEditorPanel(lf.ui.Panel):
             # Live value label — always reflects current drag value
             ui.set_next_item_width(_LIVE_W)
             ui.label(f"{buf[col]:.3f}")
-
+            ui.same_line()
+        
 
             # Manual input box — for direct typing
             val_changed, typed_val = _try_input_float(
