@@ -478,36 +478,20 @@ class KeyframeEditorPanel(lf.ui.Panel):
             ui.same_line()
         ui.new_line()
 
-        # Custom value — [-] [+] buttons update the string buffer explicitly
+        # Custom value — [-] [+] buttons with label display, no input box
         ui.label("Custom:")
         ui.same_line()
         if ui.small_button("-##cm"):
             self._set_time_mult(self._time_mult - 0.5)
         ui.same_line()
+        ui.label(f"{self._time_mult:.2f}x")
+        ui.same_line()
         if ui.small_button("+##cm"):
             self._set_time_mult(self._time_mult + 0.5)
         ui.same_line()
-        # input_text so we fully control the displayed string
-        ui.set_next_item_width(80)
-        try:
-            changed, text = ui.input_text("##custom_mult", self._time_mult_str)
-            if changed:
-                self._time_mult_str = text
-                try:
-                    self._time_mult = max(0.01, float(text))
-                except ValueError:
-                    pass
-        except Exception:
-            # fallback to input_float if input_text unavailable
-            val_changed, new_mult = _try_input_float(
-                ui, "##custom_mult", self._time_mult, 80
-            )
-            if val_changed:
-                self._set_time_mult(new_mult)
-        ui.same_line()
         if ui.button("Apply##cm"):
             e = self._apply_time_multiplier(self._time_mult, kf_nodes)
-            self._status = f"Error: {e}" if e else f"All times × {self._time_mult}."
+            self._status = f"Error: {e}" if e else f"All times × {self._time_mult:.2f}."
 
         ui.separator()
 
