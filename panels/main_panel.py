@@ -1,6 +1,7 @@
 """
-Keyframe Editor Panel - FULL EDIT VERSION
+Keyframe Editor Panel - FINAL VERSION
 All 9 fields editable via save→edit→reload JSON camera path.
+Layout: Label | [value box] | [slider] | [-] Med [+]
 """
 from __future__ import annotations
 import json
@@ -9,32 +10,32 @@ import os
 import lichtfeld as lf
 
 _FLOAT_COLS = ["time", "pos_x", "pos_y", "pos_z", "rot_x", "rot_y", "rot_z", "rot_w", "fov_mm"]
-_EDIT_COLS  = _FLOAT_COLS  # all fields now editable
+_EDIT_COLS  = _FLOAT_COLS
 
 _SPEED_PRESETS = {
-    "time":   [10.0, 1.0, 0.1],
-    "fov_mm": [10.0, 1.0, 0.1],
-    "pos_x":  [10.0,  1, 0.01],
-    "pos_y":  [10.0,  1, 0.01],
-    "pos_z":  [10.0,  1, 0.01],
-    "rot_x":  [0.1, 0.01, 0.001],
-    "rot_y":  [0.1, 0.01, 0.001],
-    "rot_z":  [0.1, 0.01, 0.001],
-    "rot_w":  [0.1, 0.01, 0.001],
+    "time":   [10.0, 1.0,  0.1],
+    "fov_mm": [10.0, 1.0,  0.1],
+    "pos_x":  [1.0,  0.1,  0.001],
+    "pos_y":  [1.0,  0.1,  0.001],
+    "pos_z":  [1.0,  0.1,  0.001],
+    "rot_x":  [0.01, 0.001, 0.0001],
+    "rot_y":  [0.01, 0.001, 0.0001],
+    "rot_z":  [0.01, 0.001, 0.0001],
+    "rot_w":  [0.01, 0.001, 0.0001],
 }
 _SPEED_LABELS = ["Fast", "Med", "Fine"]
 
-_DRAG_W    = 100   # narrower slider to make room
-_VAL_W     = 100   # manual input box
-_LIVE_W    = 100    # live value label width
+_SUMMARY_W = 480
+_DRAG_W    = 200
+_VAL_W     = 100
 
-# (col, label, min, max)  — all editable now
+# (col, label, min, max)
 _EDITOR_FIELDS = [
     ("time",   "Time",    0.0,    3600.0),
     ("fov_mm", "FoV mm",  1.0,    300.0),
-    ("pos_x",  "Pos X",   -500.0, 500.0),
-    ("pos_y",  "Pos Y",   -500.0, 500.0),
-    ("pos_z",  "Pos Z",   -500.0, 500.0),
+    ("pos_x",  "Pos X",   -200.0, 200.0),
+    ("pos_y",  "Pos Y",   -200.0, 200.0),
+    ("pos_z",  "Pos Z",   -200.0, 200.0),
     ("rot_x",  "Rot X",   -1.0,   1.0),
     ("rot_y",  "Rot Y",   -1.0,   1.0),
     ("rot_z",  "Rot Z",   -1.0,   1.0),
@@ -70,7 +71,6 @@ def _node_to_dict(node) -> dict:
 
 
 def _load_camera_path_json() -> dict | None:
-    """Save current camera path to temp file and return parsed JSON."""
     try:
         tmp = tempfile.mktemp(suffix=".json")
         lf.ui.save_camera_path(tmp)
@@ -88,24 +88,21 @@ def _load_camera_path_json() -> dict | None:
 
 def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
     """
-    Save camera path JSON, apply any pending edits, reload.
+    Save camera path JSON, apply pending edits, reload.
     edits: {nid: {col: value, ...}}
     """
     try:
-        # 1. Save current state to JSON
         data = _load_camera_path_json()
         if data is None:
             return "Failed to save camera path"
 
         keyframes = data.get("keyframes", [])
-
-        # 2. Sort nodes by current time to match JSON order
         nodes_sorted = sorted(all_nodes, key=lambda n: float(n.keyframe_data().time))
 
         if len(nodes_sorted) != len(keyframes):
-            return f"Node count mismatch: {len(nodes_sorted)} nodes vs {len(keyframes)} JSON entries"
+            return (f"Node count mismatch: {len(nodes_sorted)} nodes "
+                    f"vs {len(keyframes)} JSON entries")
 
-        # 3. Apply edits to JSON entries
         for i, node in enumerate(nodes_sorted):
             nid = str(node.id)
             if nid not in edits:
@@ -130,7 +127,6 @@ def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
                     float(ed.get("rot_w", kf["rotation"][3])),
                 ]
 
-        # 4. Write modified JSON to temp file and reload
         tmp = tempfile.mktemp(suffix=".json")
         with open(tmp, "w") as f:
             json.dump(data, f, indent=2)
@@ -140,7 +136,7 @@ def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
         except Exception:
             pass
 
-        print(f"[KFEditor] Camera path reloaded with {len(edits)} edited keyframe(s)")
+        print(f"[KFEditor] Reloaded with {len(edits)} edited keyframe(s)")
         return ""
 
     except Exception as exc:
@@ -149,7 +145,6 @@ def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
 
 
 def _write_single_node(node, d: dict, all_nodes: list) -> str:
-    """Write a single node by passing a one-entry edits dict."""
     return _write_all_keyframes(all_nodes, {str(node.id): d})
 
 
@@ -161,6 +156,7 @@ def _try_input_float(ui, uid, val, width):
     ui.set_next_item_width(width)
     changed, new_val = ui.input_float(uid, val)
     return changed, float(new_val)
+
 
 class KeyframeEditorPanel(lf.ui.Panel):
     id    = "keyframe_editor.panel"
@@ -227,7 +223,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
             ui.label(lbl)
             ui.same_line()
 
-            # Manual input box — immediately after label
+            # Manual input box
             val_changed, typed_val = _try_input_float(
                 ui, f"##val_{nid}_{col}", buf[col], _VAL_W
             )
@@ -235,7 +231,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
                 buf[col] = max(mn, min(mx, typed_val))
             ui.same_line()
 
-            # Slider
+            # Slider (no value overlay)
             ui.set_next_item_width(_DRAG_W)
             try:
                 changed, new_val = ui.slider_float(
@@ -251,7 +247,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
                     buf[col] = float(new_val)
             ui.same_line()
 
-            # [-] Med [+] on the right
+            # [-] Med [+] speed controls
             if ui.small_button(f"-##{nid}_{col}"):
                 self._cycle_speed(nid, col, -1)
             ui.same_line()
@@ -260,18 +256,10 @@ class KeyframeEditorPanel(lf.ui.Panel):
             if ui.small_button(f"+##{nid}_{col}"):
                 self._cycle_speed(nid, col, +1)
 
-            # Manual input box — sole value display
-            val_changed, typed_val = _try_input_float(
-                ui, f"##val_{nid}_{col}", buf[col], _VAL_W
-            )
-            if val_changed:
-                buf[col] = max(mn, min(mx, typed_val))
-                
         ui.spacing()
         ui.separator()
         ui.spacing()
 
-        # Apply — write this keyframe only
         if ui.button_styled(f"Apply##{nid}", "primary"):
             e = _write_single_node(node, buf, kf_nodes)
             if e:
@@ -284,7 +272,6 @@ class KeyframeEditorPanel(lf.ui.Panel):
 
         ui.same_line()
 
-        # Save draft — store without writing
         if ui.button(f"Save Draft##{nid}"):
             draft = {k: buf[k] for k in _EDIT_COLS if buf[k] != live[k]}
             self._edits[nid] = draft
@@ -341,7 +328,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
         # Column header
         ui.label("Name")
         ui.same_line()
-        # ui.set_next_item_width(_SUMMARY_W)
+        ui.set_next_item_width(_SUMMARY_W)
         ui.label("Summary  (Time | Pos | Rot | FoV)")
         ui.same_line()
         ui.label("Actions")
@@ -365,7 +352,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
                 f"{_fmt(cur['rot_z'])}, {_fmt(cur['rot_w'])})  "
                 f"f={_fmt(cur['fov_mm'])}"
             )
-            # ui.set_next_item_width(_SUMMARY_W)
+            ui.set_next_item_width(_SUMMARY_W)
             if ed:
                 ui.label(f"* {summary}")
             else:
