@@ -1,7 +1,10 @@
 """
-Keyframe Editor Panel - DRAFT VERSION
-All 9 fields editable via save→edit→reload JSON camera path.
-Layout: Label | [value box] | [slider] | [-] Med [+]
+Keyframe Editor Panel - FINAL VERSION v2
+- fov_mm renamed to Lens throughout
+- Easing selector per keyframe (0=Linear, 1=EaseIn, 2=EaseOut, 3=EaseInOut)
+- No easing shown for the last keyframe
+- All 9 fields editable via save→edit→reload JSON camera path
+- Layout: Label | [value box] | [slider] | [-] Med [+]
 """
 from __future__ import annotations
 import json
@@ -9,21 +12,23 @@ import tempfile
 import os
 import lichtfeld as lf
 
-_FLOAT_COLS = ["time", "pos_x", "pos_y", "pos_z", "rot_x", "rot_y", "rot_z", "rot_w", "Lens_mm"]
+_FLOAT_COLS = ["time", "pos_x", "pos_y", "pos_z", "rot_x", "rot_y", "rot_z", "rot_w", "lens"]
 _EDIT_COLS  = _FLOAT_COLS
 
 _SPEED_PRESETS = {
-    "time":   [10.0, 1.0,  0.1],
-    "Lens_mm": [10.0, 1.0,  0.1],
-    "pos_x":  [1.0,  0.1,  0.001],
-    "pos_y":  [1.0,  0.1,  0.001],
-    "pos_z":  [1.0,  0.1,  0.001],
-    "rot_x":  [0.01, 0.001, 0.0001],
-    "rot_y":  [0.01, 0.001, 0.0001],
-    "rot_z":  [0.01, 0.001, 0.0001],
-    "rot_w":  [0.01, 0.001, 0.0001],
+    "time":  [10.0, 1.0,  0.1],
+    "lens":  [10.0, 1.0,  0.1],
+    "pos_x": [1.0,  0.1,  0.001],
+    "pos_y": [1.0,  0.1,  0.001],
+    "pos_z": [1.0,  0.1,  0.001],
+    "rot_x": [0.01, 0.001, 0.0001],
+    "rot_y": [0.01, 0.001, 0.0001],
+    "rot_z": [0.01, 0.001, 0.0001],
+    "rot_w": [0.01, 0.001, 0.0001],
 }
 _SPEED_LABELS = ["Fast", "Med", "Fine"]
+
+_EASING_LABELS = ["Linear", "EaseIn", "EaseOut", "EaseInOut"]
 
 _SUMMARY_W = 480
 _DRAG_W    = 200
@@ -31,21 +36,21 @@ _VAL_W     = 100
 
 # (col, label, min, max)
 _EDITOR_FIELDS = [
-    ("time",   "Time",    0.0,    3600.0),
-    ("Lens_mm", "Lens mm",  1.0,    300.0),
-    ("pos_x",  "Pos X",   -200.0, 200.0),
-    ("pos_y",  "Pos Y",   -200.0, 200.0),
-    ("pos_z",  "Pos Z",   -200.0, 200.0),
-    ("rot_x",  "Rot X",   -1.0,   1.0),
-    ("rot_y",  "Rot Y",   -1.0,   1.0),
-    ("rot_z",  "Rot Z",   -1.0,   1.0),
-    ("rot_w",  "Rot W",   -1.0,   1.0),
+    ("time",  "Time",   0.0,    3600.0),
+    ("lens",  "Lens",   1.0,    300.0),
+    ("pos_x", "Pos X",  -200.0, 200.0),
+    ("pos_y", "Pos Y",  -200.0, 200.0),
+    ("pos_z", "Pos Z",  -200.0, 200.0),
+    ("rot_x", "Rot X",  -1.0,   1.0),
+    ("rot_y", "Rot Y",  -1.0,   1.0),
+    ("rot_z", "Rot Z",  -1.0,   1.0),
+    ("rot_w", "Rot W",  -1.0,   1.0),
 ]
 
 _GROUP_BEFORE = {
-    "time":   "Time & Lens",
-    "pos_x":  "Position",
-    "rot_x":  "Rotation (quaternion)",
+    "time":  "Time & Lens",
+    "pos_x": "Position",
+    "rot_x": "Rotation (quaternion)",
 }
 
 
@@ -62,11 +67,12 @@ def _node_to_dict(node) -> dict:
     pos = kf.position
     rot = kf.rotation
     return {
-        "time":  float(kf.time),
-        "pos_x": float(pos[0]), "pos_y": float(pos[1]), "pos_z": float(pos[2]),
-        "rot_x": float(rot[0]), "rot_y": float(rot[1]),
-        "rot_z": float(rot[2]), "rot_w": float(rot[3]),
-        "lens_mm":float(kf.focal_length_mm),
+        "time":   float(kf.time),
+        "pos_x":  float(pos[0]), "pos_y": float(pos[1]), "pos_z": float(pos[2]),
+        "rot_x":  float(rot[0]), "rot_y": float(rot[1]),
+        "rot_z":  float(rot[2]), "rot_w": float(rot[3]),
+        "lens":   float(kf.focal_length_mm),
+        "easing": int(kf.easing),
     }
 
 
@@ -96,7 +102,7 @@ def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
         if data is None:
             return "Failed to save camera path"
 
-        keyframes = data.get("keyframes", [])
+        keyframes    = data.get("keyframes", [])
         nodes_sorted = sorted(all_nodes, key=lambda n: float(n.keyframe_data().time))
 
         if len(nodes_sorted) != len(keyframes):
@@ -109,10 +115,11 @@ def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
                 continue
             ed = edits[nid]
             kf = keyframes[i]
+
             if "time" in ed:
                 kf["time"] = float(ed["time"])
-            if "lens_mm" in ed:
-                kf["focal_length_mm"] = float(ed["lens_mm"])
+            if "lens" in ed:
+                kf["focal_length_mm"] = float(ed["lens"])
             if any(k in ed for k in ("pos_x", "pos_y", "pos_z")):
                 kf["position"] = [
                     float(ed.get("pos_x", kf["position"][0])),
@@ -126,6 +133,9 @@ def _write_all_keyframes(all_nodes: list, edits: dict) -> str:
                     float(ed.get("rot_z", kf["rotation"][2])),
                     float(ed.get("rot_w", kf["rotation"][3])),
                 ]
+            # Easing — never written for the last keyframe
+            if "easing" in ed and i < len(keyframes) - 1:
+                kf["easing"] = int(ed["easing"])
 
         tmp = tempfile.mktemp(suffix=".json")
         with open(tmp, "w") as f:
@@ -173,9 +183,9 @@ class KeyframeEditorPanel(lf.ui.Panel):
         return True
 
     def __init__(self):
-        self._edits:     dict[str, dict[str, float]] = {}
+        self._edits:     dict[str, dict] = {}
         self._expanded:  str | None = None
-        self._edit_buf:  dict[str, float] = {}
+        self._edit_buf:  dict = {}
         self._speed_idx: dict[str, dict[str, int]] = {}
         self._status:    str = ""
 
@@ -196,19 +206,22 @@ class KeyframeEditorPanel(lf.ui.Panel):
             self._edit_buf = {**live, **self._edits.get(nid, {})}
             self._expanded = nid
 
-    def _draw_inline_editor(self, ui, node, kf_nodes):
+    def _draw_inline_editor(self, ui, node, kf_nodes, is_last: bool):
         nid  = str(node.id)
         live = _node_to_dict(node)
 
-        # Safety: ensure all keys present in buf
+        # Safety: ensure all float keys present in buf
         for k in _FLOAT_COLS:
             if k not in self._edit_buf:
                 self._edit_buf[k] = live[k]
+        if "easing" not in self._edit_buf:
+            self._edit_buf["easing"] = live["easing"]
         buf = self._edit_buf
 
         ui.separator()
         ui.spacing()
 
+        # ── Float fields ──────────────────────────────────────────────────
         for col, lbl, mn, mx in _EDITOR_FIELDS:
             if col in _GROUP_BEFORE:
                 ui.spacing()
@@ -219,11 +232,9 @@ class KeyframeEditorPanel(lf.ui.Panel):
             spd_lbl = _SPEED_LABELS[spd_idx]
             speed   = _SPEED_PRESETS[col][spd_idx]
 
-            # Label
             ui.label(lbl)
             ui.same_line()
 
-            # Manual input box
             val_changed, typed_val = _try_input_float(
                 ui, f"##val_{nid}_{col}", buf[col], _VAL_W
             )
@@ -231,7 +242,6 @@ class KeyframeEditorPanel(lf.ui.Panel):
                 buf[col] = max(mn, min(mx, typed_val))
             ui.same_line()
 
-            # Slider (no value overlay)
             ui.set_next_item_width(_DRAG_W)
             try:
                 changed, new_val = ui.slider_float(
@@ -247,7 +257,6 @@ class KeyframeEditorPanel(lf.ui.Panel):
                     buf[col] = float(new_val)
             ui.same_line()
 
-            # [-] Med [+] speed controls
             if ui.small_button(f"-##{nid}_{col}"):
                 self._cycle_speed(nid, col, -1)
             ui.same_line()
@@ -256,10 +265,29 @@ class KeyframeEditorPanel(lf.ui.Panel):
             if ui.small_button(f"+##{nid}_{col}"):
                 self._cycle_speed(nid, col, +1)
 
+        # ── Easing ────────────────────────────────────────────────────────
+        ui.spacing()
+        ui.label("Easing")
+        ui.separator()
+
+        if is_last:
+            ui.text_disabled("No easing on last keyframe.")
+        else:
+            cur_easing = int(buf.get("easing", 0))
+            for i, elbl in enumerate(_EASING_LABELS):
+                if cur_easing == i:
+                    ui.button_styled(f"{elbl}##{nid}_e{i}", "primary")
+                else:
+                    if ui.button(f"{elbl}##{nid}_e{i}"):
+                        buf["easing"] = i
+                if i < len(_EASING_LABELS) - 1:
+                    ui.same_line()
+
         ui.spacing()
         ui.separator()
         ui.spacing()
 
+        # ── Action buttons ─────────────────────────────────────────────────
         if ui.button_styled(f"Apply##{nid}", "primary"):
             e = _write_single_node(node, buf, kf_nodes)
             if e:
@@ -273,7 +301,10 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.same_line()
 
         if ui.button(f"Save Draft##{nid}"):
-            draft = {k: buf[k] for k in _EDIT_COLS if buf[k] != live[k]}
+            live2 = _node_to_dict(node)
+            draft = {k: buf[k] for k in _FLOAT_COLS if buf[k] != live2[k]}
+            if not is_last and int(buf.get("easing", 0)) != int(live2.get("easing", 0)):
+                draft["easing"] = int(buf["easing"])
             self._edits[nid] = draft
             self._status   = f"{node.name} draft saved ({len(draft)} change(s))."
             self._expanded = None
@@ -296,6 +327,10 @@ class KeyframeEditorPanel(lf.ui.Panel):
         if not kf_nodes:
             ui.text_disabled("No keyframe nodes found in scene.")
             return
+
+        # Sort by time so we can reliably identify the last keyframe
+        kf_nodes_sorted = sorted(kf_nodes, key=lambda n: float(n.keyframe_data().time))
+        last_nid = str(kf_nodes_sorted[-1].id) if kf_nodes_sorted else None
 
         if self._status:
             ui.label(self._status)
@@ -329,28 +364,31 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.label("Name")
         ui.same_line()
         ui.set_next_item_width(_SUMMARY_W)
-        ui.label("Summary  (Time | Pos | Rot | Lens)")
+        ui.label("Summary  (Time | Pos | Rot | Lens | Easing)")
         ui.same_line()
         ui.label("Actions")
         ui.separator()
 
-        # Data rows
-        for node in kf_nodes:
+        # Data rows in time order
+        for node in kf_nodes_sorted:
             nid     = str(node.id)
             live    = _node_to_dict(node)
             ed      = self._edits.get(nid, {})
             cur     = {**live, **ed}
             is_open = (self._expanded == nid)
+            is_last = (nid == last_nid)
 
             ui.label(node.name)
             ui.same_line()
 
+            easing_str = "" if is_last else f"  e={_EASING_LABELS[int(cur.get('easing', 0))]}"
             summary = (
                 f"t={_fmt(cur['time'])}  "
                 f"p=({_fmt(cur['pos_x'])}, {_fmt(cur['pos_y'])}, {_fmt(cur['pos_z'])})  "
                 f"r=({_fmt(cur['rot_x'])}, {_fmt(cur['rot_y'])}, "
                 f"{_fmt(cur['rot_z'])}, {_fmt(cur['rot_w'])})  "
-                f"f={_fmt(cur['lens_mm'])}"
+                f"l={_fmt(cur['lens'])}"
+                f"{easing_str}"
             )
             ui.set_next_item_width(_SUMMARY_W)
             if ed:
@@ -369,4 +407,4 @@ class KeyframeEditorPanel(lf.ui.Panel):
                     self._status = f"{node.name} draft discarded."
 
             if is_open:
-                self._draw_inline_editor(ui, node, kf_nodes)
+                self._draw_inline_editor(ui, node, kf_nodes, is_last)
