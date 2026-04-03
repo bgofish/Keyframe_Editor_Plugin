@@ -164,18 +164,19 @@ def _try_input_float(ui, uid, val, width):
         return changed, float(new_val)
     except Exception:
         pass
-    ui.set_next_item_width(width)  # must re-set before fallback widget
+    # input_float not available — use input_text with same uid
+    ui.set_next_item_width(width)
     try:
-        changed, text = ui.input_text(uid + "_t", f"{val:.3f}")
+        changed, text = ui.input_text(uid, f"{val:.3f}")
         if changed:
             try:
                 return True, float(text)
             except ValueError:
                 pass
+        return False, val
     except Exception:
         pass
     return False, val
-
 
 class KeyframeEditorPanel(lf.ui.Panel):
     id    = "keyframe_editor.panel"
