@@ -478,7 +478,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
             ui.same_line()
         ui.new_line()
 
-        # Custom value — [-] [+] buttons with label display, no input box
+        # Custom value — [-] label [+] manual entry [Apply]
         ui.label("Custom:")
         ui.same_line()
         if ui.small_button("-##cm"):
@@ -488,6 +488,12 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.same_line()
         if ui.small_button("+##cm"):
             self._set_time_mult(self._time_mult + 0.5)
+        ui.same_line()
+        val_changed, new_mult = _try_input_float(
+            ui, "##custom_mult_manual", self._time_mult, 80
+        )
+        if val_changed:
+            self._set_time_mult(new_mult)
         ui.same_line()
         if ui.button("Apply##cm"):
             e = self._apply_time_multiplier(self._time_mult, kf_nodes)
