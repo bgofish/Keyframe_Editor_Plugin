@@ -255,22 +255,23 @@ class KeyframeEditorPanel(lf.ui.Panel):
                 self._cycle_speed(nid, col, +1)
             ui.same_line()
 
-            # Drag slider
+            # Slider — try to suppress value display with empty format string
             ui.set_next_item_width(_DRAG_W)
-            changed, new_val = ui.drag_float(
-                f"##drag_{nid}_{col}", buf[col], speed, mn, mx
-            )
-            if changed:
-                buf[col] = float(new_val)
+            try:
+                changed, new_val = ui.slider_float(
+                    f"##drag_{nid}_{col}", buf[col], mn, mx, ""
+                )
+                if changed:
+                    buf[col] = float(new_val)
+            except Exception:
+                changed, new_val = ui.drag_float(
+                    f"##drag_{nid}_{col}", buf[col], speed, mn, mx
+                )
+                if changed:
+                    buf[col] = float(new_val)
             ui.same_line()
 
-            # Live value label — always reflects current drag value
-            ui.set_next_item_width(_LIVE_W)
-            ui.label(f"{buf[col]:.3f}")
-            ui.same_line()
-        
-
-            # Manual input box — for direct typing
+            # Manual input box — sole value display
             val_changed, typed_val = _try_input_float(
                 ui, f"##val_{nid}_{col}", buf[col], _VAL_W
             )
