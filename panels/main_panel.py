@@ -157,14 +157,21 @@ def _fmt(v: float) -> str:
     return f"{v:.3f}"
 
 
+_INPUT_MODE = None  # will be set to "float" or "text" on first successful call
+
 def _try_input_float(ui, uid, val, width):
+    global _INPUT_MODE
+
     ui.set_next_item_width(width)
-    try:
-        changed, new_val = ui.input_float(uid, val)
-        return changed, float(new_val)
-    except Exception:
-        pass
-    # input_float not available — use input_text with same uid
+
+    if _INPUT_MODE != "text":
+        try:
+            changed, new_val = ui.input_float(uid, val)
+            _INPUT_MODE = "float"
+            return changed, float(new_val)
+        except Exception:
+            _INPUT_MODE = "text"
+
     ui.set_next_item_width(width)
     try:
         changed, text = ui.input_text(uid, f"{val:.3f}")
