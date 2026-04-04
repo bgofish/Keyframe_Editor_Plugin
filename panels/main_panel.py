@@ -194,22 +194,23 @@ class KeyframeEditorPanel(lf.ui.Panel):
     style    = ""
     height_mode       = lf.ui.PanelHeightMode.FILL
     poll_dependencies = {lf.ui.PollDependency.SCENE}
-    #poll_dependencies = [lf.ui.PollDependency.SCENE]
+
     @classmethod
     def poll(cls, context) -> bool:
         return True
 
     def __init__(self):
-        self._edits:         dict[str, dict] = {}
-        self._expanded:      str | None = None
-        self._edit_buf:      dict = {}
-        self._speed_idx:     dict[str, dict[str, int]] = {}
-        self._clipboard:     dict | None = None
-        self._time_mult:     float = 1.000
-        self._time_mult_str: str = "1.001"
-        self._status:        str = ""
+        self._edits         = {}
+        self._expanded      = None
+        self._edit_buf      = {}
+        self._speed_idx     = {}
+        self._clipboard     = None
+        self._time_mult     = 1.000
+        self._time_mult_str = "1.001"
+        self._status        = ""
 
         # ── Path Player state ─────────────────────────────────────────────
+        self._PP_HANDLER       = "kf_editor_path_preview"
         self._pp_player        = None
         self._pp_path          = ""
         self._pp_speed         = 1.0
@@ -221,8 +222,6 @@ class KeyframeEditorPanel(lf.ui.Panel):
         self._pp_start_elapsed = 0.0
         self._pp_show          = False
         self._pp_status        = ""
-
-        self._PP_HANDLER = "kf_editor_path_preview"
     # ── helpers ───────────────────────────────────────────────────────────
 
     def _cycle_speed(self, nid, col, direction):
@@ -452,8 +451,6 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.separator()
 
     # ── Path Player section ───────────────────────────────────────────────
-
-
 
     def _pp_start(self):
         """Register the draw handler that drives real-time camera playback."""
@@ -797,4 +794,3 @@ class KeyframeEditorPanel(lf.ui.Panel):
 
         # ── Path Player ───────────────────────────────────────────────────
         self._draw_path_player(ui)
-print("[KFEditor] module loaded OK")
