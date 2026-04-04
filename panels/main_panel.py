@@ -595,7 +595,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.label(f"Time: {self._pp_elapsed:.2f}s / {dur:.2f}s")
         ui.set_next_item_width(350)
         scrub_changed, scrub_val = ui.slider_float(
-            "##pp_scrub", self._pp_elapsed, 0.0, dur, ""
+            "##pp_scrub", self._pp_elapsed, 0.0, dur
         )
         if scrub_changed and not self._pp_playing:
             self._pp_elapsed = float(scrub_val)
