@@ -193,8 +193,8 @@ class KeyframeEditorPanel(lf.ui.Panel):
     template = ""
     style    = ""
     height_mode       = lf.ui.PanelHeightMode.FILL
-    poll_dependencies = {lf.ui.PollDependency.SCENE}
-
+    #poll_dependencies = {lf.ui.PollDependency.SCENE}
+    poll_dependencies = [lf.ui.PollDependency.SCENE]
     @classmethod
     def poll(cls, context) -> bool:
         return True
