@@ -1,7 +1,7 @@
 [project]
 name = "Keyframe_Editor"
 version = "0.1.6"
-description = "Edit timeline keyframes in a Table-style panel"
+description = "Edit timeline keyframes in a Table-style panel "
 authors = "Brian Davis (bb6)"
 dependencies = []
 
