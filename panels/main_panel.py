@@ -221,6 +221,8 @@ class KeyframeEditorPanel(lf.ui.Panel):
         self._pp_start_elapsed = 0.0
         self._pp_show          = False
         self._pp_status        = ""
+
+        self._PP_HANDLER = "kf_editor_path_preview"
     # ── helpers ───────────────────────────────────────────────────────────
 
     def _cycle_speed(self, nid, col, direction):
@@ -451,7 +453,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
 
     # ── Path Player section ───────────────────────────────────────────────
 
-    _PP_HANDLER = "kf_editor_path_preview"
+
 
     def _pp_start(self):
         """Register the draw handler that drives real-time camera playback."""
