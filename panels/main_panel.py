@@ -375,7 +375,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
             ui.set_next_item_width(_DRAG_W)
             try:
                 changed, new_val = ui.slider_float(
-                    f"##drag_{nid}_{col}", buf[col], mn, mx, ""
+                    f"##drag_{nid}_{col}", buf[col], mn, mx
                 )
                 if changed:
                     buf[col] = float(new_val)
