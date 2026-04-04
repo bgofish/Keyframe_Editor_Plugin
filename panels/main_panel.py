@@ -14,6 +14,18 @@ import tempfile
 import os
 import lichtfeld as lf
 
+import sys
+_plugin_dir = os.path.dirname(os.path.abspath(__file__))
+if _plugin_dir not in sys.path:
+    sys.path.insert(0, _plugin_dir)
+_PP_IMPORT_ERR = ""
+try:
+    from lfs_path_player import LFSPathPlayer
+    _HAS_PATH_PLAYER = True
+except Exception as _e:
+    _HAS_PATH_PLAYER = False
+    _PP_IMPORT_ERR = str(_e)
+
 _FLOAT_COLS = ["time", "pos_x", "pos_y", "pos_z", "rot_x", "rot_y", "rot_z", "rot_w", "lens"]
 _EDIT_COLS  = _FLOAT_COLS
 
@@ -196,6 +208,19 @@ class KeyframeEditorPanel(lf.ui.Panel):
         self._time_mult:     float = 1.000
         self._time_mult_str: str = "1.001"
         self._status:        str = ""
+
+        # ── Path Player state ─────────────────────────────────────────────
+        self._pp_player:         object = None
+        self._pp_path:           str    = ""
+        self._pp_speed:          float  = 1.0
+        self._pp_loop:           bool   = True
+        self._pp_playing:        bool   = False
+        self._pp_elapsed:        float  = 0.0
+        self._pp_last_tick:      float  = 0.0
+        self._pp_start_wall:     float  = 0.0
+        self._pp_start_elapsed:  float  = 0.0
+        self._pp_show:           bool   = False
+        self._pp_status:         str    = ""
 
     # ── helpers ───────────────────────────────────────────────────────────
 
@@ -425,6 +450,170 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.spacing()
         ui.separator()
 
+    # ── Path Player section ───────────────────────────────────────────────
+
+    _PP_HANDLER = "kf_editor_path_preview"
+
+    def _pp_start(self):
+        """Register the draw handler that drives real-time camera playback."""
+        import time as _time
+        self._pp_playing   = True
+        self._pp_start_wall = _time.time()
+        self._pp_start_elapsed = self._pp_elapsed
+        try:
+            lf.remove_draw_handler(self._PP_HANDLER)
+        except Exception:
+            pass
+        lf.add_draw_handler(self._PP_HANDLER, self._pp_draw_handler, "POST_VIEW")
+        lf.ui.request_redraw()
+
+    def _pp_stop(self, reset: bool = False):
+        """Unregister the draw handler and optionally reset playhead."""
+        self._pp_playing = False
+        try:
+            lf.remove_draw_handler(self._PP_HANDLER)
+        except Exception:
+            pass
+        if reset:
+            self._pp_elapsed = 0.0
+        lf.ui.request_redraw()
+
+    def _pp_draw_handler(self, ctx) -> None:
+        """POST_VIEW draw handler — advances clock and moves the viewport camera."""
+        import time as _time
+        if not self._pp_playing or self._pp_player is None:
+            self._pp_stop()
+            return
+
+        elapsed = ((_time.time() - self._pp_start_wall) * self._pp_speed
+                   + self._pp_start_elapsed)
+        dur = self._pp_player.total_duration
+
+        if self._pp_loop:
+            elapsed = elapsed % dur
+        elif elapsed >= dur:
+            elapsed = dur
+            self._pp_stop()
+            self._pp_elapsed = dur
+            self._pp_status  = "Playback complete."
+            return
+
+        self._pp_elapsed = elapsed
+
+        try:
+            eye, target, up, fov = self._pp_player.get_camera_at_snap(
+                0, 1.0, self._pp_loop  # unused snap_index — we pass t directly below
+            )
+            # Call _interpolate directly so we drive by real time, not snap index
+            pos, rot, pfov = self._pp_player._interpolate(elapsed, loop=self._pp_loop)
+            import math as _math
+            from lfs_path_player import _quat_rotate
+            forward = _quat_rotate(rot, (0.0, 0.0, 1.0))
+            up_vec  = _quat_rotate(rot, (0.0, 1.0, 0.0))
+            target  = (pos[0] + forward[0], pos[1] + forward[1], pos[2] + forward[2])
+            lf.set_camera(pos, target, up_vec)
+            lf.set_camera_fov(pfov)
+        except Exception as exc:
+            self._pp_stop()
+            self._pp_status = f"Camera error: {exc}"
+            return
+
+        lf.ui.request_redraw()
+
+    def _draw_path_player(self, ui):
+        """Collapsible real-time path playback section powered by LFSPathPlayer."""
+        ui.spacing()
+        toggle_lbl = "▼ Path Player" if self._pp_show else "▶ Path Player"
+        if ui.button(toggle_lbl):
+            self._pp_show = not self._pp_show
+        ui.separator()
+
+        if not self._pp_show:
+            return
+
+        if not _HAS_PATH_PLAYER:
+            ui.text_disabled(f"lfs_path_player import failed: {_PP_IMPORT_ERR}")
+            ui.text_disabled(f"Plugin dir on sys.path: {_plugin_dir}")
+            return
+
+        # ── Load ──────────────────────────────────────────────────────
+        if ui.button("Load Path##pp_load"):
+            self._pp_stop(reset=True)
+            try:
+                tmp = tempfile.mktemp(suffix=".json")
+                lf.ui.save_camera_path(tmp)
+                self._pp_player = LFSPathPlayer(tmp)
+                self._pp_status = (f"Loaded  —  {self._pp_player.n_keyframes} keyframes  |  "
+                                   f"duration {self._pp_player.total_duration:.2f}s")
+            except Exception as exc:
+                self._pp_player = None
+                self._pp_status = f"Load error: {exc}"
+
+        if self._pp_status:
+            ui.label(self._pp_status)
+
+        if self._pp_player is None:
+            ui.text_disabled("No path loaded.")
+            return
+
+        dur = self._pp_player.total_duration
+        ui.separator()
+
+        # ── Speed & Loop ──────────────────────────────────────────────
+        ui.label("Speed:")
+        ui.same_line()
+        spd_changed, new_spd = _try_input_float(ui, "##pp_spd", self._pp_speed, 60)
+        if spd_changed and new_spd > 0.0:
+            self._pp_speed = new_spd
+        ui.same_line()
+        ui.label("x    Loop(leave ON to stop crashing) :")
+        ui.same_line()
+        lp_changed, new_lp = ui.checkbox("##pp_loop", self._pp_loop)
+        if lp_changed:
+            self._pp_loop = bool(new_lp)
+
+        # ── Transport ─────────────────────────────────────────────────
+        ui.spacing()
+        play_lbl = "⏸ Pause##pp_play" if self._pp_playing else "▶ Play##pp_play"
+        if ui.button_styled(play_lbl, "primary"):
+            if not self._pp_playing:
+                if self._pp_elapsed >= dur and not self._pp_loop:
+                    self._pp_elapsed = 0.0
+                self._pp_status = "Playing…"
+                self._pp_start()
+            else:
+                self._pp_stop()
+                self._pp_status = f"Paused at {self._pp_elapsed:.2f}s"
+
+        ui.same_line()
+        if ui.button("⏹ Stop##pp_stop"):
+            self._pp_stop(reset=True)
+            self._pp_status = "Stopped."
+
+        # ── Scrub slider (only when paused) ───────────────────────────
+        ui.spacing()
+        ui.label(f"Time: {self._pp_elapsed:.2f}s / {dur:.2f}s")
+        ui.set_next_item_width(350)
+        scrub_changed, scrub_val = ui.slider_float(
+            "##pp_scrub", self._pp_elapsed, 0.0, dur, ""
+        )
+        if scrub_changed and not self._pp_playing:
+            self._pp_elapsed = float(scrub_val)
+            try:
+                pos, rot, pfov = self._pp_player._interpolate(self._pp_elapsed, loop=self._pp_loop)
+                import math as _math
+                from lfs_path_player import _quat_rotate
+                forward = _quat_rotate(rot, (0.0, 0.0, 1.0))
+                up_vec  = _quat_rotate(rot, (0.0, 1.0, 0.0))
+                target  = (pos[0] + forward[0], pos[1] + forward[1], pos[2] + forward[2])
+                lf.set_camera(pos, target, up_vec)
+                lf.set_camera_fov(pfov)
+            except Exception as exc:
+                self._pp_status = f"Scrub error: {exc}"
+
+        ui.spacing()
+        ui.separator()
+
     # ── main draw ─────────────────────────────────────────────────────────
 
     def draw(self, ui):
@@ -604,3 +793,6 @@ class KeyframeEditorPanel(lf.ui.Panel):
 
             if is_open:
                 self._draw_inline_editor(ui, node, kf_nodes, is_last)
+
+        # ── Path Player ───────────────────────────────────────────────────
+        self._draw_path_player(ui)
