@@ -210,18 +210,17 @@ class KeyframeEditorPanel(lf.ui.Panel):
         self._status:        str = ""
 
         # ── Path Player state ─────────────────────────────────────────────
-        self._pp_player:         object = None
-        self._pp_path:           str    = ""
-        self._pp_speed:          float  = 1.0
-        self._pp_loop:           bool   = True
-        self._pp_playing:        bool   = False
-        self._pp_elapsed:        float  = 0.0
-        self._pp_last_tick:      float  = 0.0
-        self._pp_start_wall:     float  = 0.0
-        self._pp_start_elapsed:  float  = 0.0
-        self._pp_show:           bool   = False
-        self._pp_status:         str    = ""
-
+        self._pp_player        = None
+        self._pp_path          = ""
+        self._pp_speed         = 1.0
+        self._pp_loop          = True
+        self._pp_playing       = False
+        self._pp_elapsed       = 0.0
+        self._pp_last_tick     = 0.0
+        self._pp_start_wall    = 0.0
+        self._pp_start_elapsed = 0.0
+        self._pp_show          = False
+        self._pp_status        = ""
     # ── helpers ───────────────────────────────────────────────────────────
 
     def _cycle_speed(self, nid, col, direction):
