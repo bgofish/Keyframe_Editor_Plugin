@@ -189,7 +189,7 @@ class KeyframeEditorPanel(lf.ui.Panel):
     id    = "keyframe_editor.panel"
     label = "Keyframe Editor"
     space = lf.ui.PanelSpace.MAIN_PANEL_TAB
-    order = 200
+    #order = 200
     #template = ""
     #style    = ""
     #height_mode       = lf.ui.PanelHeightMode.FILL
