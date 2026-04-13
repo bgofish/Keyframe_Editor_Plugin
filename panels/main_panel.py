@@ -209,6 +209,9 @@ class KeyframeEditorPanel(lf.ui.Panel):
         self._time_mult_str: str = "1.001"
         self._status:        str = ""
 
+        # ── TimeStretch state ─────────────────────────────────────────────
+        self._stretch_duration: float = 10.0
+
         # ── Path Player state ─────────────────────────────────────────────
         self._pp_player:         object = None
         self._pp_path:           str    = ""
@@ -243,6 +246,30 @@ class KeyframeEditorPanel(lf.ui.Panel):
         self._time_mult_str = f"{self._time_mult:.3f}"
 
     # ── global operations ─────────────────────────────────────────────────
+
+    def _stretch_to_duration(self, target_duration: float, all_nodes: list) -> str:
+        """Remap all keyframe times proportionally so the sequence spans target_duration seconds."""
+        try:
+            if target_duration <= 0:
+                return "Target duration must be greater than 0."
+            data = _load_camera_path_json()
+            if data is None:
+                return "Failed to load camera path"
+            keyframes = data.get("keyframes", [])
+            if len(keyframes) < 2:
+                return "Need at least 2 keyframes to stretch."
+            times = [float(kf["time"]) for kf in keyframes]
+            first_t = min(times)
+            last_t  = max(times)
+            original_range = last_t - first_t
+            if original_range <= 0:
+                return "Invalid time range: all keyframes share the same time value."
+            for kf in keyframes:
+                ratio     = (float(kf["time"]) - first_t) / original_range
+                kf["time"] = round(ratio * target_duration, 6)
+            return _reload_from_keyframe_list(keyframes, data.get("version", 3))
+        except Exception as exc:
+            return str(exc)
 
     def _apply_time_multiplier(self, multiplier: float, all_nodes: list) -> str:
         try:
@@ -501,14 +528,11 @@ class KeyframeEditorPanel(lf.ui.Panel):
         self._pp_elapsed = elapsed
 
         try:
-            eye, target, up, fov = self._pp_player.get_camera_at_snap(
-                0, 1.0, self._pp_loop  # unused snap_index — we pass t directly below
-            )
             # Call _interpolate directly so we drive by real time, not snap index
             pos, rot, pfov = self._pp_player._interpolate(elapsed, loop=self._pp_loop)
-            import math as _math
-            from lfs_path_player import _quat_rotate
-            forward = _quat_rotate(rot, (0.0, 0.0, 1.0))
+            from lfs_path_player import _quat_rotate, Y_UP
+            fwd_vec = (0.0, 0.0, -1.0) if Y_UP else (0.0, 0.0, 1.0)
+            forward = _quat_rotate(rot, fwd_vec)
             up_vec  = _quat_rotate(rot, (0.0, 1.0, 0.0))
             target  = (pos[0] + forward[0], pos[1] + forward[1], pos[2] + forward[2])
             lf.set_camera(pos, target, up_vec)
@@ -595,15 +619,15 @@ class KeyframeEditorPanel(lf.ui.Panel):
         ui.label(f"Time: {self._pp_elapsed:.2f}s / {dur:.2f}s")
         ui.set_next_item_width(350)
         scrub_changed, scrub_val = ui.slider_float(
-            "##pp_scrub", self._pp_elapsed, 0.0, dur, ""
+            "##pp_scrub", self._pp_elapsed, 0.0, dur
         )
         if scrub_changed and not self._pp_playing:
             self._pp_elapsed = float(scrub_val)
             try:
                 pos, rot, pfov = self._pp_player._interpolate(self._pp_elapsed, loop=self._pp_loop)
-                import math as _math
-                from lfs_path_player import _quat_rotate
-                forward = _quat_rotate(rot, (0.0, 0.0, 1.0))
+                from lfs_path_player import _quat_rotate, Y_UP
+                fwd_vec = (0.0, 0.0, -1.0) if Y_UP else (0.0, 0.0, 1.0)
+                forward = _quat_rotate(rot, fwd_vec)
                 up_vec  = _quat_rotate(rot, (0.0, 1.0, 0.0))
                 target  = (pos[0] + forward[0], pos[1] + forward[1], pos[2] + forward[2])
                 lf.set_camera(pos, target, up_vec)
@@ -679,6 +703,25 @@ class KeyframeEditorPanel(lf.ui.Panel):
         if ui.button("Apply##cm"):
             e = self._apply_time_multiplier(self._time_mult, kf_nodes)
             self._status = f"Error: {e}" if e else f"All times × {self._time_mult:.3f}."
+
+        # ── TimeStretch toolbar ───────────────────────────────────────────
+        ui.spacing()
+        ui.label("TimeStretch")
+        ui.separator()
+        ui.label("Target duration (s):")
+        ui.same_line()
+        ts_changed, new_ts = _try_input_float(
+            ui, "##timestretch_dur", self._stretch_duration, 100
+        )
+        if ts_changed:
+            self._stretch_duration = max(0.001, round(float(new_ts), 3))
+        ui.same_line()
+        if ui.button_styled("Launch##ts", "primary"):
+            e = self._stretch_to_duration(self._stretch_duration, kf_nodes)
+            self._status = (
+                f"Error: {e}" if e
+                else f"Stretched {len(kf_nodes)} keyframes to {self._stretch_duration:.3f}s."
+            )
 
         ui.separator()
 
